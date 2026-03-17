@@ -22,12 +22,13 @@ function [properties,aerodynamics,initialization] = original_xzylo()
     properties.span = properties.Xzylo.b;
     properties.f_coeff = 7e-4; % Friction Torque Coefficient
     
-    %% Aerodynamics Group
     % ------------------------- Environmental Properties ---------------------------
-    aerodynamics.rho = 1.225;
-    aerodynamics.V_wind_i = [0; 0; 0]; % wind velocity in inertial frame [m/s]
-    aerodynamics.g = 9.81;
-    
+    properties.rho = 1.225;
+    properties.V_wind_i = [0; 0; 0]; % wind velocity in inertial frame [m/s]
+    properties.g = 9.81;
+       
+    %% Aerodynamics Group
+
     %----------------------- Aerodynamic coefficient functions --------------------------
     aerodynamics_xzylo      % run aerodynamic file for interpolation of data    
     aerodynamics.Xzylo.C_L = @(angle) C_L_interp(angle);
@@ -37,7 +38,7 @@ function [properties,aerodynamics,initialization] = original_xzylo()
     % aerodynamics.Xzylo.C_Y =  @(angle) 0;
 
     % Trim conditions 
-    [properties.alpha_trim, properties.V_trim, properties.Thrust_req] = calculate_trim(properties.percentage_CoG_total, properties.mass_total*aerodynamics.g, aerodynamics.rho,...
+    [properties.alpha_trim, properties.V_trim, properties.Thrust_req] = calculate_trim(properties.percentage_CoG_total, properties.mass_total*properties.g, properties.rho,...
                                                                                     properties.Area, aerodynamics.Xzylo.C_L, aerodynamics.Xzylo.C_D, aerodynamics.Xzylo.CoP_frac);
 
     % Optional external force/moment (written in INERTIAL frame)
