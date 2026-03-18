@@ -3,7 +3,7 @@
 %% ===============================
 
 close all; clear; clc;
-globalData % load the global struct for logging data from utils_calc folder
+% globalData % load the global struct for logging data from utils_calc folder
 
 %% ------------- INITIALIZATION -------------------------------------------
 % Select vehicle configuration
@@ -14,7 +14,7 @@ vehicle_config = @original_xzylo;  % Put the name of the body_file after @
 [sim.prop, sim.aero, sim.initial] = vehicle_config(); %properties, aerodynamics, initial conditions
 % =============================================
 
-x0 = [sim.initial.v0 sim.initial.omega0 sim.initial.quat0 sim.initial.pos0]';
+x0 = [sim.initial.v0 sim.initial.omega0 sim.initial.quat0 sim.initial.pos0];
 sim.initial.x0 = x0;
 
 % --- Simulation setup ---
@@ -34,23 +34,36 @@ fprintf('----------------------------------\n')
 fprintf('Trim AoA: %.2f°\n', rad2deg(sim.prop.alpha_trim))
 fprintf('Trim Velocity: %.2f m/s\n', sim.prop.V_trim)
 fprintf('Trim Thrust: %.3f N\n', sim.prop.Thrust_req)
-fprintf('----------------------------------\n\n')
+fprintf('----------------------------------\n')
 
 %% ------------- PLOTTING OPTIONS -----------------------------------------
 sim.options.propeller_on = false;
 sim.options.test_plotting = false;
 sim.options.body_plotting = false;
-sim.options.non_rotating_plotting = false;
+sim.options.non_rotating_plotting = true;
 sim.options.live_plotting_residuals = false; 
 sim.options.radius_visualization = 1;
 
 % ========================= INTEGRATOR ===============================
 options_integration = options_premaker(sim.options.live_plotting_residuals, sim);
 
+fprintf('Starting integration...\n'); tic; 
+% Start the integration process using the ODE solver
 [t, x] = ode45(@(t,x) sixDoF_wrapper(t,x,sim), tspan, x0, options_integration);
+
+time_ode = toc; 
+fprintf('Integration finished in %.3f seconds.\n', time_ode);
 % ====================================================================
 
 %% ------------- POST-PROCESSING ------------------------------------------
-plot_results(t, x, sim);
+tic;
+SIM_DATA = compute_logged_data(t, x, sim);
+time_log = toc;
+fprintf('Post-processing finished in %.3f seconds.\n', time_log);
+
+% SIM_DATA is already in the workspace!
+plot_results(t, x, sim, SIM_DATA); 
+% plot_animation(t, x, sim, SIM_DATA);
 plot_animation(t, x, sim);
+
 % visualization_XZylo_orientation(sim);

@@ -1,5 +1,4 @@
-function plot_results(t, x, sim)
-    global SIM_DATA; 
+function plot_results(t, x, sim, SIM_DATA)
     
     % --- Handle default params ---
     if nargin < 3; sim.options = struct(); end
@@ -55,11 +54,11 @@ function plot_results(t, x, sim)
     % 4. Aerodynamic Angles
     figure('Name','Aerodynamic Angles')
     hold on
-    plot(SIM_DATA.t, rad2deg(SIM_DATA.alpha), 'LineWidth', 1.5);
-    plot(SIM_DATA.t, rad2deg(SIM_DATA.beta), 'LineWidth', 1.5);
+    % plot(SIM_DATA.t, rad2deg(SIM_DATA.alpha), 'LineWidth', 1.5);
+    % plot(SIM_DATA.t, rad2deg(SIM_DATA.beta), 'LineWidth', 1.5);
     plot(SIM_DATA.t, rad2deg(SIM_DATA.alpha_equivalent), 'LineWidth', 1.5);
     xlabel('Time [s]'); ylabel('Aerodynamic angles [deg]');
-    legend('\alpha','\beta','\alpha_{equivalent}');
+    legend('\alpha_{equivalent}');
     grid on; title('Aerodynamic angles');
     
     % 5. Aero coefficients

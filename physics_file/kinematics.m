@@ -1,4 +1,4 @@
-function [v_dot_b, omega_dot_b, q_dot, pos_dot_i] = kinematics(v_b, omega_b, q, F_b, M_b, R_bi, sim)
+function [v_dot_b, omega_dot_b, q_dot, pos_dot_i] = kinematics(v_b, omega_b, F_b, M_b, q, R_bi, sim)
 % KINEMATICS Compute translational and rotational derivatives for 6DoF
 %
 % Inputs:
@@ -8,7 +8,7 @@ function [v_dot_b, omega_dot_b, q_dot, pos_dot_i] = kinematics(v_b, omega_b, q, 
 %   F_b      - total force in body frame (3x1)
 %   M_b      - total moment about CoM in body frame (3x1)
 %   R_bi     - body->inertial rotation matrix (3x3)
-%   params   - parameter struct with .m, .I, Hr_b, Hr_dot_b
+%   sim      - parameter struct with properties
 %
 % Outputs:
 %   v_dot_b     - body-frame acceleration (3x1)

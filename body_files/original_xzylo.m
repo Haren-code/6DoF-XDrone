@@ -41,7 +41,7 @@ function [properties,aerodynamics,initialization] = original_xzylo()
     [properties.alpha_trim, properties.V_trim, properties.Thrust_req] = calculate_trim(properties.percentage_CoG_total, properties.mass_total*properties.g, properties.rho,...
                                                                                     properties.Area, aerodynamics.Xzylo.C_L, aerodynamics.Xzylo.C_D, aerodynamics.Xzylo.CoP_frac);
 
-    % Optional external force/moment (written in INERTIAL frame)
+    % Optional external force/moment (written in BODY frame)
     aerodynamics.Fext = @(t) (t >= 0 && t <= 30) * [0; 0; 0];
     aerodynamics.Mext = @(t) (t >= 0 && t <= 30) * [0; 0; 0]; 
 

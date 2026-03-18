@@ -81,27 +81,32 @@ function [properties,aerodynamics,initialization] = xzylo_with_propeller()
     aerodynamics.g = 9.81;
     
     %----------------------- Aerodynamic coefficient functions --------------------------
-    aerodynamics_xzylo      % run aerodynamic file for interpolation of data
-    aerodynamics.Xzylo.C_L =  @(angle) interp1(alpha_rad_CL, C_L_sym_smooth, angle, 'pchip', 'extrap');            
-    aerodynamics.Xzylo.C_D =  @(angle) interp1(alpha_rad_CD, C_D_sym_smooth, angle, 'pchip', 'extrap');
-    aerodynamics.Xzylo.CoP_frac = @(angle) interp1(alpha_rad_COP, COP_sym_smooth, angle, 'pchip', 'extrap')./100;
-    aerodynamics.Xzylo.C_m =  @(angle) (properties.percentage_CoG_total(1) - aerodynamics.Xzylo.CoP_frac(angle)) * (aerodynamics.Xzylo.C_L(angle) * cos(angle) + aerodynamics.Xzylo.C_D(angle) * sin(angle));
-    aerodynamics.Xzylo.C_Y =  @(angle) 0;
+    aerodynamics_xzylo      % run aerodynamic file for interpolation of data    
+    aerodynamics.Xzylo.C_L = @(angle) C_L_interp(angle);
+    aerodynamics.Xzylo.C_D = @(angle) C_D_interp(angle);
+    aerodynamics.Xzylo.CoP_frac = @(angle) CoP_interp(angle);
+    % aerodynamics.Xzylo.C_m =  @(angle) (x_CoG - x_CoP(angle)) * (C_L*sin(angle) + C_D*cos(angle))
+    % aerodynamics.Xzylo.C_Y =  @(angle) 0;
+
+    % Trim conditions 
+    [properties.alpha_trim, properties.V_trim, properties.Thrust_req] = calculate_trim(properties.percentage_CoG_total, properties.mass_total*aerodynamics.g, aerodynamics.rho,...
+                                                                                    properties.Area, aerodynamics.Xzylo.C_L, aerodynamics.Xzylo.C_D, aerodynamics.Xzylo.CoP_frac);
 
     % Optional external force/moment (written in INERTIAL frame)
     aerodynamics.Fext = @(t) (t >= 0 && t <= 30) * [0; 0; 0];
     aerodynamics.Mext = @(t) (t >= 0 && t <= 30) * [0; 0; 0]; 
 
     % ------------------------- Initialization states ------------------------------------
-    initialization.launch_angle = 10; % launch angle in degrees
+    initialization.launch_angle = 12; % launch angle in degrees
     initialization.V_mag = 20; % Magnitude of the launch velocity
-    initialization.Omega_mag = 50; % Rotational speed at launch [RPS]
+    initialization.Omega_mag = 40; % Rotational speed at launch [RPS]
+    initialization.AoA = 0;    
 
-    initialization.v0 = [initialization.V_mag*cosd(0),  0  , -initialization.V_mag*sind(0)]; % initial velocity vector (u,v,w)_0   [m/s]
+    initialization.v0 = [initialization.V_mag*cosd(initialization.AoA),  0  , initialization.V_mag*sind(initialization.AoA)]; % initial velocity vector (u,v,w)_0   [m/s]
     initialization.omega0 = [2*pi*initialization.Omega_mag, 0, 0]; % initial rotational velocity vector (p,q,r)_0  [rad/s]
-    initialization.euler0 = [0*pi/180, initialization.launch_angle*pi/180, 0*pi/180]; %[yaw pitch roll];   % [psi theta phi]
+    initialization.euler0 = [deg2rad(0), deg2rad(initialization.launch_angle), deg2rad(0)]; %[yaw pitch roll];   % [psi theta phi]
     initialization.quat0  = eul2quat(initialization.euler0);   % returns [w x y z]
-    initialization.pos0 = [0 0 -30]; % initial position in inertial frame [m]
+    initialization.pos0 = [0 0 -1.5]; % initial position in inertial frame [m]
     initialization.tf = 30; %maximum simulation time
    
 end
