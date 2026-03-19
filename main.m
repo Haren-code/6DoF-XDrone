@@ -67,4 +67,4 @@ fprintf('Post-processing finished in %.3f seconds.\n', time_log);
 plot_results(t, x, sim, SIM_DATA); 
 plot_animation(t, x, sim);
 
-visualization_XZylo_orientation(sim);
+% visualization_XZylo_orientation(sim);
