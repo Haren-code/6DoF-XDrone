@@ -88,15 +88,41 @@ function [F_b, M_b] = dynamics(t, v_b, omega_b, R_ib, sim)
 
     %% ================= PROPELLER =================
     if sim.options.propeller_on
-        n_rad_per_sec = abs(sim.prop.Prop.omega + p);
-        J = u ./ (4 * pi .* n_rad_per_sec .* sim.prop.Prop.radius);
-        f_advance = max(0, 1 - sim.prop.Prop.k_V .* J - sim.prop.Prop.k_V .* J.^2);
+        D = 2*sim.prop.Prop.radius;
+
+        n_rad_per_sec = abs(sim.prop.Prop.omega + omega_b(1));
+        J = (2* pi * u_no_sdslip) / (n_rad_per_sec * D);
         
-        T_prop = f_advance * (sim.prop.Prop.k_T * n_rad_per_sec.^2) * [1;0;0];
-        Q_prop = f_advance * (sim.prop.Prop.k_Q * n_rad_per_sec.^2) * [1;0;0];
+        k_T = sim.prop.Prop.k_T_0 * (1 - (J / (3/3*0.955))^1.5);
+        k_Q = sim.prop.Prop.k_Q_0 * (1 - (0.7 * (J / (3/3*0.955))^1.33));
+
+        T_prop = k_T * sim.prop.rho * (n_rad_per_sec^2 * D^4) / (2*pi)^2 * [1;0;0];
+        
+        Q_prop = k_Q * sim.prop.rho * (n_rad_per_sec^2 * D^5) / (2*pi)^2 * [1;0;0];
     else
         T_prop = [0;0;0]; 
         Q_prop = [0;0;0];
+    end
+
+    %% ================= MOTOR BLADES =================
+    % 1. Interpolate Torque for the specific V and RPM
+    if sim.options.mBlades_on
+        mBlades_Torque_val = interp2(sim.aero.mblades.V_grid, ...
+                                 sim.aero.mblades.RPM_grid, ...
+                                 sim.aero.mblades.Torque_map, ...
+                                 u_no_sdslip, omega_b(1), 'linear');
+    
+        % 2. Interpolate Drag for the specific V and RPM
+        mBlades_Drag_val = interp2(sim.aero.mblades.V_grid, ...
+                               sim.aero.mblades.RPM_grid, ...
+                               sim.aero.mblades.Drag_map, ...
+                               u_no_sdslip, omega_b(1), 'linear');
+
+        mBlades_Torque = mBlades_Torque_val*[1;0;0]; 
+        mBlades_Drag = mBlades_Drag_val*[1;0;0];
+    else
+        mBlades_Torque = [0;0;0]; 
+        mBlades_Drag = [0;0;0];
     end
 
     %% ================= GRAVITY =================
@@ -107,7 +133,7 @@ function [F_b, M_b] = dynamics(t, v_b, omega_b, R_ib, sim)
     
     %% ================= TOTAL FORCES =================
     % Forces in body frame including gravity, external forces and propeller
-    F_b = F_aero_body + F_g_b + T_prop + sim.aero.Fext(t);
+    F_b = F_aero_body + F_g_b + T_prop - mBlades_Drag + sim.aero.Fext(t);
 
 
     %% ================= TOTAL MOMENTS =================
@@ -128,6 +154,6 @@ function [F_b, M_b] = dynamics(t, v_b, omega_b, R_ib, sim)
     T_friction = sim.prop.f_coeff*(pi*sim.prop.rho*omega_b(1)^2*sim.prop.span^4*sim.prop.chord)*[1;0;0];
 
     % Add all the moments
-    M_b = M_aero + Q_prop - T_friction + sim.aero.Mext(t);
+    M_b = M_aero + Q_prop - T_friction + mBlades_Torque + sim.aero.Mext(t);
 
 end

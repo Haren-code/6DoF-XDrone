@@ -13,10 +13,10 @@ RPM_design   = 1500;    % [RPM]
 Omega_design = RPM_design*2*pi/60;
 
 % -- Geometry Dimensions --
-R_hub  = 11e-3;        % [m]
+R_hub  = 11e-3;         % [m]
 R_duct = 56.7e-3;       % [m]
 hub_h  = 0.03;          % [m]
-duct_h = 0.115;           % [m]
+duct_h = 0.115;         % [m]
 c_base = hub_h - 2e-3;  % [m] Base Chord (before scaling)
 B  = 2;                 % Number of Blades
 
@@ -26,7 +26,7 @@ B  = 2;                 % Number of Blades
 blade_mode = 1; 
 
 rotation_position = 0;  % 0 = LE (Since LE is at 0,0)
-alpha_d = deg2rad(0);   % <--- UPDATED TO 0 DEG (ZERO LIFT DESIGN)
+alpha_d = deg2rad(0);   % ZERO LIFT DESIGN
 N_span  = 50;           % Grid resolution
 rho     = 1.225;        % Air Density
 
@@ -85,9 +85,9 @@ for i = 1:N_span
 end
 
 %% ========================================================================
-%%            PART 2: INDUCTION ANALYSIS (WITH HUB CLAMP)
+%%            PART 2: INDUCTION ANALYSIS (TURBINE BEM)
 %% ========================================================================
-fprintf('\n--- Running Induction Check (BEM) ---\n');
+fprintf('\n--- Running Induction Check (Turbine BEM) ---\n');
 
 % Load Polar Data
 csv_filename = 'xf-n0012-il-200000.csv';
@@ -104,19 +104,13 @@ for k = 1:N_span-1
     beta_local = (beta_phys(k) + beta_phys(k+1))/2;
     sigma = (B * c_local) / (2 * pi * r_local);
     
-    % Initialize
     a = 0; ap = 0; alpha_deg = 0; 
     
-    % --- HUB CLAMP FIX ---
-    % If this is the very first point (k=1), it is often unstable.
-    % We will SKIP calculation for k=1 and fill it later using k=2.
     if k == 1
-        % Mark as NaN to fill later
         a_dist(k) = NaN; ap_dist(k) = NaN; alpha_check(k) = NaN;
         continue; 
     end
     
-    % Standard Loop for k > 1
     if r_local > (R_hub + 1e-4)
         for iter = 1:100 
             denom = V_inf_design * (1 - a); 
@@ -139,20 +133,18 @@ for k = 1:N_span-1
             Cl = interp1(Alpha_data, Cl_data, alpha_deg, 'linear', 'extrap');
             Cd = interp1(Alpha_data, Cd_data, alpha_deg, 'linear', 'extrap');
             
-            Cn = Cl * cos_p + Cd * sin_p; 
-            Ct = Cl * sin_p - Cd * cos_p; 
+            % TURBINE PHYSICS: Swapped coefficients
+            Cn = Cl * sin_p + Cd * cos_p; % Axial 
+            Ct = Cl * cos_p - Cd * sin_p; % Tangential
             
             if abs(Cn) < 1e-5
                 a_new = 0; ap_new = 0;
             else
                 CT_local = sigma * Cn * (1-a)^2 / (sin_p^2);
-                if CT_local > 0.96 
-                    val = 0.889 - CT_local; if val < 0; val = 0; end 
-                    a_new = (1/F) * (0.143 + sqrt(0.0203 - 0.6427 * val));
-                else
-                    denom_a = (4 * F * sin_p^2) / (sigma * Cn);
-                    a_new = 1 / (denom_a + 1);
-                end
+                % Standard BEM induction calculations
+                denom_a = (4 * F * sin_p^2) / (sigma * Cn);
+                a_new = 1 / (denom_a + 1);
+                
                 denom_ap = (4 * F * sin_p * cos_p) / (sigma * Ct);
                 ap_new = 1 / (denom_ap - 1);
             end
@@ -167,9 +159,6 @@ for k = 1:N_span-1
     a_dist(k) = a; ap_dist(k) = ap; alpha_check(k) = alpha_deg;
 end
 
-% --- FILL THE HUB POINT (k=1) ---
-% Set the first point equal to the second point (Constant extrapolation)
-% This removes the "jump" by forcing continuity at the root.
 a_dist(1) = a_dist(2);
 ap_dist(1) = ap_dist(2);
 alpha_check(1) = alpha_check(2);
@@ -180,11 +169,11 @@ subplot(2,1,1); plot(r_plot, a_dist, 'r-o', 'LineWidth', 1.5); grid on; title('A
 subplot(2,1,2); plot(r_plot, alpha_check, 'k-d', 'LineWidth', 1.5); yline(rad2deg(alpha_d),'r--','Target'); grid on; xlabel('Span [m]'); ylabel('AoA [deg]'); title('Actual AoA');
 
 %% ========================================================================
-%%            PART 3: AERODYNAMIC MAPS
+%%            PART 3: AERODYNAMIC MAPS (LOOKUP TABLE)
 %% ========================================================================
-fprintf('\n--- Generating Performance Maps ---\n');
-v_vec   = linspace(10, 30, 5);   
-rpm_vec = linspace(1000, 3000, 5); 
+fprintf('\n--- Generating Turbine Performance Maps ---\n');
+v_vec   = linspace(10, 30, 50);   % Increased resolution for smoother map
+rpm_vec = linspace(1000, 3000, 50); 
 [V_GRID, RPM_GRID] = meshgrid(v_vec, rpm_vec);
 Torque_Map = zeros(size(V_GRID)); Drag_Map = zeros(size(V_GRID));
 
@@ -208,24 +197,28 @@ for i = 1:size(V_GRID, 1)
             L = 0.5 * rho * V_rel^2 * c_local * Cl; 
             D = 0.5 * rho * V_rel^2 * c_local * Cd; 
             
-            dF_thrust = L * sin(phi) - D * cos(phi);
-            dF_torque = L * cos(phi) + D * sin(phi);
-            T_sum = T_sum + dF_torque * r_local * dr;
-            D_sum = D_sum + dF_thrust * dr;
+            % TURBINE PHYSICS: Lift drives, Drag resists. Both push backward.
+            dF_axial_drag = L * sin(phi) + D * cos(phi);
+            dF_driving_torque = L * cos(phi) - D * sin(phi);
+            
+            T_sum = T_sum + dF_driving_torque * r_local * dr;
+            D_sum = D_sum + dF_axial_drag * dr;
         end
         Torque_Map(i,j) = T_sum * B; Drag_Map(i,j) = D_sum * B;
     end
 end
 
 %% ============== FIGURE: MAPS ==================
-figure('Color','w','Name','Performance Maps','WindowStyle','docked'); 
+figure('Color','w','Name','Turbine Performance Maps','WindowStyle','docked'); 
 subplot(1,2,1); [C,h] = contourf(V_GRID, RPM_GRID, Torque_Map, 40); clabel(C,h); colorbar; colormap(jet); hold on;
+% This white line shows your zero-torque freewheeling states!
 contour(V_GRID, RPM_GRID, Torque_Map, [0 0], 'w', 'LineWidth', 3);
 plot(V_inf_design, RPM_design, 'p', 'MarkerSize', 18, 'MarkerFaceColor',[1 0.84 0], 'MarkerEdgeColor','k');
-xlabel('V [m/s]'); ylabel('RPM'); title('TORQUE [Nm]');
+xlabel('V [m/s]'); ylabel('RPM'); title('TURBINE TORQUE [Nm]');
+
 subplot(1,2,2); [C2,h2] = contourf(V_GRID, RPM_GRID, Drag_Map, 40); clabel(C2,h2); colorbar; colormap(hot); hold on;
 plot(V_inf_design, RPM_design, 'p', 'MarkerSize', 18, 'MarkerFaceColor',[1 0.84 0], 'MarkerEdgeColor','k');
-xlabel('V [m/s]'); ylabel('RPM'); title('THRUST / DRAG [N]');
+xlabel('V [m/s]'); ylabel('RPM'); title('AXIAL DRAG [N]');
 
 %% ========================================================================
 %%            PART 4: 3D GEOMETRY PLOT
@@ -234,7 +227,7 @@ xlabel('V [m/s]'); ylabel('RPM'); title('THRUST / DRAG [N]');
 fig = figure('Color','w','Name','Blade Geometry');
 axes; hold on; axis equal; grid on
 xlabel('X (Radial)'); ylabel('Y (Tangential)'); zlabel('Z (Axial)');
-title(['Blade Geometry (B=' num2str(B) ') - NACA 0012'])
+title(['Turbine Geometry (B=' num2str(B) ') - NACA 0012'])
 view(35,20); camlight; lighting gouraud
 X_air = (X_norm - rotation_position) * c_base; Y_air = Y_norm * c_base;
 setappdata(fig,'geom',struct('R_hub',R_hub,'R_duct',R_duct,'hub_h',hub_h,'duct_h',duct_h,'c_blade',c_base,'B',B,'x_span',x_span,'beta',beta_phys,'rotation_position', rotation_position,'X_air',X_air,'Y_air',Y_air,'N_span',N_span,'idx_LE', idx_LE, 'idx_TE', idx_TE,'sx',sx,'sy',sy,'sz',sz,'r_marker',r_marker ));

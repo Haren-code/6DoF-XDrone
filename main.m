@@ -38,14 +38,16 @@ fprintf('----------------------------------\n')
 
 %% ------------- PLOTTING OPTIONS -----------------------------------------
 sim.options.propeller_on = false;
-sim.options.test_plotting = false;
+sim.options.mBlades_on = false;
+
 sim.options.body_plotting = false;
 sim.options.non_rotating_plotting = true;
-sim.options.live_plotting_residuals = false; 
-sim.options.radius_visualization = 1;
+sim.options.test_plotting = false;
+sim.options.live_plotting_calculation = false; 
+sim.options.radius_visualization = 5;
 
 % ========================= INTEGRATOR ===============================
-options_integration = options_premaker(sim.options.live_plotting_residuals, sim);
+options_integration = options_premaker(sim.options.live_plotting_calculation, sim);
 
 fprintf('Starting integration...\n'); tic; 
 % Start the integration process using the ODE solver
@@ -63,7 +65,6 @@ fprintf('Post-processing finished in %.3f seconds.\n', time_log);
 
 % SIM_DATA is already in the workspace!
 plot_results(t, x, sim, SIM_DATA); 
-% plot_animation(t, x, sim, SIM_DATA);
 plot_animation(t, x, sim);
 
-% visualization_XZylo_orientation(sim);
+visualization_XZylo_orientation(sim);

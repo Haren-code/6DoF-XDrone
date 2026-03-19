@@ -1,34 +1,32 @@
 function [properties,aerodynamics,initialization] = xzylo_with_propeller()
-    %%--------------------- Parameters for inertia calculation ------------------------
-    % Ring 1
-    M1 = 6.23*1e-3;      % kg
-    R_o1 = 97*1e-3 /2;   % m (Outer Radius)
-    R_i1 = 96*1e-3 /2;   % m (Inner Radius)
-    L1 = 54.5*1e-3;      % m (Length/Chord)
-    X1 = 54.5*1e-3 /2;   % m (X-position of CoM)
-    
-    % Ring 2 
-    M2 = 16.5*1e-3;      % kg
-    R_o2 = 97*1e-3 /2;   % m
-    R_i2 = 95*1e-3 /2;   % m
-    L2 = 13*1e-3;        % m
-    X2 = 13.0*1e-3 /2 ;  % m
-
-    %% --------------- Execute the function for inertia calculation --------------------
-    inertia_results = calculate_inertia(M1, R_o1, R_i1, L1, X1, M2, R_o2, R_i2, L2, X2);
-
-    properties.Xzylo.CoG_pos = inertia_results.r_cg; % From the leading edge 0.0122
-    properties.Xzylo.percentage_CoG = properties.Xzylo.CoG_pos./L1 ; %0.2236 original
-    properties.Xzylo.I = inertia_results.I_total; %%% AROUND ITS OWN COG
-    properties.Xzylo.mass = inertia_results.M_total;  % mass [kg]
-    properties.Xzylo.b = R_o1;   % span = diameter
-    properties.Xzylo.c = L1;     % chord = distance from LE to TE
+  
+    %% --------------- Properties of the craft - X-Zylo in this case -------------------
+    properties.Xzylo.CoG_pos = 12.234e-3; % From the leading edge 
+    properties.Xzylo.b = 96.5e-3;         % span = diameter
+    properties.Xzylo.c = 54.5e-3;         % chord = distance from LE to TE
+    properties.Xzylo.percentage_CoG =  properties.Xzylo.CoG_pos/properties.Xzylo.c; %0.22448
+    properties.Xzylo.mass = 22.69e-3;  % mass [kg]
+    properties.Xzylo.I = 1e-9 * [52309.988 0 0
+                                 0 29891.828 0
+                                 0 0 29891.828]; % Around the CoG
     properties.Xzylo.S = properties.Xzylo.b*properties.Xzylo.c; % reference area
     properties.Xzylo.aspect_ratio = properties.Xzylo.b/properties.Xzylo.c; % span/chord
-    properties.Xzylo.f_coeff = 5e-3; % Friction Torque Coefficient
+
+    %% ------------------------- Complete System Mass and CoG -------------------------
+    properties.mass_total = properties.Xzylo.mass;
+    properties.CoG_pos_total = properties.Xzylo.CoG_pos;
+    properties.percentage_CoG_total = properties.Xzylo.percentage_CoG;
+    properties.Area = properties.Xzylo.S;
+    properties.chord = properties.Xzylo.c;
+    properties.span = properties.Xzylo.b;
+    properties.f_coeff = 7e-4; % Friction Torque Coefficient
+    
+    % ------------------------- Environmental Properties ---------------------------
+    properties.rho = 1.225;
+    properties.V_wind_i = [0; 0; 0]; % wind velocity in inertial frame [m/s]
+    properties.g = 9.81;
 
     %% ------------------------- PROPELLER CONFIGURATION ---------------------------
-
     % Negative RPM = Counter-Rotating (Opposite to X-Zylo spin)
     Prop_rpm   = -25000;  % 10 - 20k rpm 
     properties.Prop.omega = 2*pi/60 * Prop_rpm;
@@ -51,16 +49,6 @@ function [properties,aerodynamics,initialization] = xzylo_with_propeller()
 
     Motor.I_xx = 0.5*properties.Motor.mass*properties.Motor.radius^2;
     Motor.I_yyzz = (0.5*Motor.I_xx + 1/12*properties.Motor.mass*properties.Motor.L^2);
-    
-
-    %% ------------------------- Complete System Mass and CoG -------------------------
-    properties.mass_total = properties.Motor.mass + properties.Prop.mass + properties.Xzylo.mass;
-    properties.CoG_pos_total = (properties.Xzylo.mass*properties.Xzylo.CoG_pos + properties.Motor.mass*properties.Motor.CoG_pos + properties.Prop.mass*properties.Prop.CoG_pos)/properties.mass_total;
-    properties.percentage_CoG_total = properties.CoG_pos_total./L1;
-
-    % X-zylo MoI
-    properties.Xzylo.I(2,2) = properties.Xzylo.I(2,2) + properties.Xzylo.mass*(properties.Xzylo.CoG_pos(1)-properties.CoG_pos_total(1))^2;
-    properties.Xzylo.I(3,3) = properties.Xzylo.I(2,2);
 
     % Propeller MoI
     prop.I_xx = 0.5*properties.Prop.mass*properties.Prop.radius^2;
@@ -75,11 +63,6 @@ function [properties,aerodynamics,initialization] = xzylo_with_propeller()
 
 
     %% Aerodynamics Group
-    % ------------------------- Environmental Properties ---------------------------
-    aerodynamics.rho = 1.225;
-    aerodynamics.V_wind_i = [0; 0; 0]; % wind velocity in inertial frame [m/s]
-    aerodynamics.g = 9.81;
-    
     %----------------------- Aerodynamic coefficient functions --------------------------
     aerodynamics_xzylo      % run aerodynamic file for interpolation of data    
     aerodynamics.Xzylo.C_L = @(angle) C_L_interp(angle);
@@ -89,10 +72,10 @@ function [properties,aerodynamics,initialization] = xzylo_with_propeller()
     % aerodynamics.Xzylo.C_Y =  @(angle) 0;
 
     % Trim conditions 
-    [properties.alpha_trim, properties.V_trim, properties.Thrust_req] = calculate_trim(properties.percentage_CoG_total, properties.mass_total*aerodynamics.g, aerodynamics.rho,...
+    [properties.alpha_trim, properties.V_trim, properties.Thrust_req] = calculate_trim(properties.percentage_CoG_total, properties.mass_total*properties.g, properties.rho,...
                                                                                     properties.Area, aerodynamics.Xzylo.C_L, aerodynamics.Xzylo.C_D, aerodynamics.Xzylo.CoP_frac);
 
-    % Optional external force/moment (written in INERTIAL frame)
+    % Optional external force/moment (written in BODY frame)
     aerodynamics.Fext = @(t) (t >= 0 && t <= 30) * [0; 0; 0];
     aerodynamics.Mext = @(t) (t >= 0 && t <= 30) * [0; 0; 0]; 
 

@@ -10,12 +10,12 @@ function status = live_dx_plot(t, y, flag, fig)
         h = getappdata(fig, 'h');
     
         for i = 1:length(t)
-            dx = sixdof_wrapper(t(i), y(:,i), sim);
-            % Update each subplot
+            % Re-evaluate physics to get the derivatives (dx)
+            dx = sixDoF_wrapper(t(i), y(:,i), sim); 
+            
+            % Instantly add points to the animated lines
             for j = 1:min(length(dx), numel(h))
-                xdata = get(h(j), 'XData');
-                ydata = get(h(j), 'YData');
-                set(h(j), 'XData', [xdata, t(i)], 'YData', [ydata, dx(j)]);
+                addpoints(h(j), t(i), dx(j));
             end
         end
         drawnow limitrate nocallbacks

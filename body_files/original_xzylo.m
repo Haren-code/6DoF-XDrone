@@ -12,7 +12,6 @@ function [properties,aerodynamics,initialization] = original_xzylo()
     properties.Xzylo.S = properties.Xzylo.b*properties.Xzylo.c; % reference area
     properties.Xzylo.aspect_ratio = properties.Xzylo.b/properties.Xzylo.c; % span/chord
 
-
     %% ------------------------- Complete System Mass and CoG -------------------------
     properties.mass_total = properties.Xzylo.mass;
     properties.CoG_pos_total = properties.Xzylo.CoG_pos;
@@ -28,7 +27,6 @@ function [properties,aerodynamics,initialization] = original_xzylo()
     properties.g = 9.81;
        
     %% Aerodynamics Group
-
     %----------------------- Aerodynamic coefficient functions --------------------------
     aerodynamics_xzylo      % run aerodynamic file for interpolation of data    
     aerodynamics.Xzylo.C_L = @(angle) C_L_interp(angle);
